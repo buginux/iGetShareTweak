@@ -19,6 +19,7 @@
 //   4. register hook using CHHook() in CHConstructor
 //   5. (optionally) call old method using CHSuper()
 
+@class ENSaveToEvernoteActivity;
 
 CHDeclareClass(SubscribeInfoWKViewController);
 
@@ -37,8 +38,18 @@ CHOptimizedMethod0(self, void, SubscribeInfoWKViewController, viewDidLoad) {
 }
 
 CHDeclareMethod1(void, SubscribeInfoWKViewController, shareButtonClicked, UIButton *, sender) {
-
-    UIActivityViewController *activity = [[UIActivityViewController alloc] initWithActivityItems:@[] applicationActivities:nil];
+    NSString *articleFilePath = [self articleFilePath];
+    if ([articleFilePath length] == 0) return;
+    
+    ENSaveToEvernoteActivity *saveActivity = [[objc_getClass("ENSaveToEvernoteActivity") alloc] init];
+    [saveActivity setNoteTitle:@"article"];
+    
+    NSString *content = [[NSString alloc] initWithContentsOfFile:articleFilePath encoding:NSUTF8StringEncoding error:nil];
+    if ([content length] == 0) return;
+    
+    NSArray *items = @[content];
+    
+    UIActivityViewController *activity = [[UIActivityViewController alloc] initWithActivityItems:items applicationActivities:@[saveActivity]];
     
     UIPopoverPresentationController *popover = activity.popoverPresentationController;
     if (popover) {
@@ -49,12 +60,8 @@ CHDeclareMethod1(void, SubscribeInfoWKViewController, shareButtonClicked, UIButt
     [self presentViewController:activity animated:YES completion:nil];
 }
 
-CHOptimizedMethod2(self, void, SubscribeInfoWKViewController, callBackAction, unsigned int, action, info, NSString *, info) {
-    CHSuper2(SubscribeInfoWKViewController, callBackAction, action, info, info);
-    
-    if (action != 1) return;
-    if ([info length] == 0) return;
-    
+
+CHDeclareMethod0(NSString *, SubscribeInfoWKViewController, articleFilePath) {
     NSString *subscribeTitle = [[[self viewModel] articleEntity] subscribe_title];
     if ([subscribeTitle length] == 0) {
         subscribeTitle = @"未知专栏";
@@ -65,22 +72,33 @@ CHOptimizedMethod2(self, void, SubscribeInfoWKViewController, callBackAction, un
     if ([articleTitle length] == 0) {
         articleTitle = @"未知文章";
     }
-
+    
     NSString *documentDirectoryPath = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
     
     NSString *allArticlesDirectory = [@"articles" stringByAppendingPathComponent:subscribeTitle];
     NSString *subscribeDirectoryPath = [documentDirectoryPath stringByAppendingPathComponent:allArticlesDirectory];
     
     BOOL createSuccess = [[NSFileManager defaultManager] createDirectoryAtPath:subscribeDirectoryPath withIntermediateDirectories:YES attributes:nil error:nil];
-    if (!createSuccess) return;
+    if (!createSuccess) return nil;
     
     NSString *filename = [NSString stringWithFormat:@"%ld-%@.html", (long)[articleId integerValue], articleTitle];
     NSString *articleFilePath = [subscribeDirectoryPath stringByAppendingPathComponent:filename];
     
-    if (![[NSFileManager defaultManager] fileExistsAtPath:articleFilePath]) {
-        [info writeToFile:articleFilePath atomically:YES encoding:NSUTF8StringEncoding error:nil];
-    }
+    return articleFilePath;
+}
+
+CHOptimizedMethod2(self, void, SubscribeInfoWKViewController, callBackAction, unsigned int, action, info, NSString *, info) {
+    CHSuper2(SubscribeInfoWKViewController, callBackAction, action, info, info);
     
+    if (action != 1) return;
+    if ([info length] == 0) return;
+    
+    NSString *filePath = [self articleFilePath];
+    if ([filePath length] == 0) return;
+    
+    if (![[NSFileManager defaultManager] fileExistsAtPath:filePath]) {
+        [info writeToFile:filePath atomically:YES encoding:NSUTF8StringEncoding error:nil];
+    }
 }
 
 
